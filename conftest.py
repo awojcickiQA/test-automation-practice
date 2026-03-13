@@ -199,6 +199,9 @@ def pytest_runtest_makereport(item, call):
             # Import here to avoid issues if plugin is not present
             try:
                 import pytest_html
+                # Initialize extra list if not present (pytest-html >= 4.x)
+                if not hasattr(report, "extra"):
+                    report.extra = []
                 if screenshot_path:
                     report.extra.append(pytest_html.extras.image(screenshot_path))
                 if video_path:
