@@ -19,22 +19,26 @@ def pytest_addoption(parser):
     )
 
 @pytest.fixture(scope="session")
-def browser(pytestconfig):
+def playwright_instance():
+    with sync_playwright() as p:
+        yield p
+
+@pytest.fixture(scope="session")
+def browser(playwright_instance, pytestconfig):
     browser_name = pytestconfig.getoption("browser_name")
     headless = pytestconfig.getoption("headless_mode").lower() == "true"
     
-    with sync_playwright() as p:
-        if browser_name == "chromium":
-            browser_instance = p.chromium.launch(headless=headless)
-        elif browser_name == "firefox":
-            browser_instance = p.firefox.launch(headless=headless)
-        elif browser_name == "webkit":
-            browser_instance = p.webkit.launch(headless=headless)
-        else:
-            raise ValueError(f"Unsupported browser: {browser_name}")
-            
-        yield browser_instance
-        browser_instance.close()
+    if browser_name == "chromium":
+        browser_instance = playwright_instance.chromium.launch(headless=headless)
+    elif browser_name == "firefox":
+        browser_instance = playwright_instance.firefox.launch(headless=headless)
+    elif browser_name == "webkit":
+        browser_instance = playwright_instance.webkit.launch(headless=headless)
+    else:
+        raise ValueError(f"Unsupported browser: {browser_name}")
+        
+    yield browser_instance
+    browser_instance.close()
 
 @pytest.fixture(scope="function")
 def page(browser, request, pytestconfig):
@@ -140,14 +144,12 @@ def page(browser, request, pytestconfig):
     context.close()
 
 @pytest.fixture(scope="session")
-def api_context(pytestconfig):
-    from playwright.sync_api import sync_playwright
-    with sync_playwright() as p:
-        request_context = p.request.new_context(
-            base_url="https://jsonplaceholder.typicode.com"
-        )
-        yield request_context
-        request_context.dispose()
+def api_context(playwright_instance, pytestconfig):
+    request_context = playwright_instance.request.new_context(
+        base_url="https://jsonplaceholder.typicode.com"
+    )
+    yield request_context
+    request_context.dispose()
 
 @pytest.hookimpl(hookwrapper=True)
 def pytest_runtest_makereport(item, call):
