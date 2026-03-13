@@ -4,3 +4,4 @@ Faker
 pytest-html
 pytest-metadata
 pytest-xdist
+pytest-rerunfailures

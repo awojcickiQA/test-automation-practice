@@ -5,13 +5,18 @@ class BasePage:
         self.page = page
 
     def navigate(self, url: str):
-        self.page.goto(url)
+        self.page.goto(url, wait_until="load")
 
-    def click(self, selector: str):
-        self.page.click(selector)
+    def click(self, selector: str, force: bool = False):
+        locator = self.page.locator(selector).first
+        locator.wait_for(state="visible", timeout=15000)
+        locator.scroll_into_view_if_needed()
+        locator.click(force=force)
 
     def fill(self, selector: str, text: str):
-        self.page.fill(selector, text)
+        locator = self.page.locator(selector).first
+        locator.wait_for(state="visible", timeout=15000)
+        locator.fill(text)
 
     def is_visible(self, selector: str) -> bool:
         return self.page.is_visible(selector)

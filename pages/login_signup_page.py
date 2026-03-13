@@ -3,13 +3,17 @@ from pages.base_page import BasePage
 
 class LoginSignupPage(BasePage):
     def register_user(self, name: str, email: str):
+        """Fill and submit the signup form. Does NOT wait for the account form,
+        because this may be called in scenarios where registration fails (e.g., 
+        existing email) and the page never navigates to the account info form.
+        """
+        self.page.locator("input[data-qa='signup-name']").wait_for(state="visible", timeout=15000)
         self.fill("input[data-qa='signup-name']", name)
         self.fill("input[data-qa='signup-email']", email)
         self.click("button[data-qa='signup-button']")
-        # Wait for the account information page to load
-        self.page.wait_for_url("**/signup", timeout=30000)
 
     def login_user(self, email: str, password: str):
+        self.page.locator("input[data-qa='login-email']").wait_for(state="visible", timeout=15000)
         self.fill("input[data-qa='login-email']", email)
         self.fill("input[data-qa='login-password']", password)
         self.page.locator("button[data-qa='login-button']").scroll_into_view_if_needed()
@@ -18,14 +22,24 @@ class LoginSignupPage(BasePage):
     def verify_error_message(self, expected_message: str):
         expect(self.page.locator(f"text={expected_message}").first).to_be_visible()
 
-    def fill_account_information(self, password: str, first_name: str, last_name: str, 
+    def fill_account_information(self, password: str, first_name: str, last_name: str,
                                  address: str, state: str, city: str, zipcode: str, mobile_number: str):
-        # Gender
-        self.page.locator("#id_gender1").check()
-        
+        """Fill the full account information form. Waits for the page to navigate
+        to the signup URL and for the form to be fully rendered before interacting.
+        """
+        # Wait for the page to navigate to the signup form
+        self.page.wait_for_url("**/signup", timeout=30000)
+        self.page.wait_for_load_state("load", timeout=30000)
+
+        # Gender radio
+        gender_radio = self.page.locator("#id_gender1")
+        gender_radio.wait_for(state="visible", timeout=45000)
+        gender_radio.check()
+
         self.fill("input[data-qa='password']", password)
-        
-        # Date of birth (just selecting something random for now or default)
+
+        # Date of birth
+        self.page.locator("select[data-qa='days']").wait_for(state="visible", timeout=10000)
         self.page.select_option("select[data-qa='days']", "1")
         self.page.select_option("select[data-qa='months']", "1")
         self.page.select_option("select[data-qa='years']", "2000")
@@ -40,7 +54,7 @@ class LoginSignupPage(BasePage):
         self.fill("input[data-qa='mobile_number']", mobile_number)
 
         self.click("button[data-qa='create-account']")
-        
+
     def verify_account_created(self):
         expect(self.page.locator("h2[data-qa='account-created']")).to_have_text("ACCOUNT CREATED!", ignore_case=True)
         self.click("a[data-qa='continue-button']")

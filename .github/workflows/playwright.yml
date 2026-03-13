@@ -43,7 +43,7 @@ jobs:
 
     - name: Run Playwright tests
       run: |
-        PYTHONPATH=. pytest --browser_name=${{ matrix.browser }} --headless_mode=true --report=${{ github.event.inputs.report || 'true' }} --report_strategy=${{ github.event.inputs.report_strategy || 'failed' }} --html=report-${{ matrix.browser }}.html --self-contained-html
+        PYTHONPATH=. pytest --browser_name=${{ matrix.browser }} --headless_mode=true --report=${{ github.event.inputs.report || 'true' }} --report_strategy=${{ github.event.inputs.report_strategy || 'failed' }} --html=report-${{ matrix.browser }}.html --self-contained-html --reruns 2 --reruns-delay 5
       
     - name: Upload Test Results
       if: always()

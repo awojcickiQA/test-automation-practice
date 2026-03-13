@@ -53,22 +53,37 @@ def page(browser, request, pytestconfig):
 
     context = browser.new_context(**context_args)
     
-    # Less aggressive ad blocking
-    ad_domains = ["googleads", "doubleclick", "adservice"]
-    context.route("**/*", lambda route: route.abort() if any(domain in route.request.url for domain in ad_domains) else route.continue_())
+    # Block known ad/tracker domains aggressively
+    blocked_domains = [
+        "googleads", "doubleclick", "adservice", "googlesyndication",
+        "adnxs", "rubiconproject", "openx", "pubmatic", "quantserve",
+        "scorecardresearch", "amazon-adsystem", "bing.com/action/0",
+        "convert.com", "hotjar.com", "fonts.googleapis.com"
+    ]
+    context.route(
+        "**/*",
+        lambda route: route.abort()
+        if any(d in route.request.url for d in blocked_domains)
+        else route.continue_()
+    )
     
     page_instance = context.new_page()
-    page_instance.set_default_timeout(45000)
+    # Increased timeout for slow CI runners
+    page_instance.set_default_timeout(60000)
+    page_instance.set_default_navigation_timeout(60000)
     
-    # Combined aggressive Ad and Consent removal (Universal)
+    # Combined Ad and Consent removal (CSS + JS removal + body unlock)
     page_instance.add_init_script("""
         (() => {
             const style = document.createElement('style');
             style.innerHTML = `
                 iframe, .adsbygoogle, #google_ads_iframe, [id^='google_ads_iframe'], 
                 #aswift_0_host, #aswift_1_host, #aswift_2_host, 
-                div[style*='z-index: 2000000000'], .fc-consent-root, .fc-dialog-overlay,
-                .fc-dialog-container, #gdpr-cookie-notice {
+                div[style*='z-index: 2000000000'],
+                .fc-consent-root, .fc-dialog-overlay, .fc-dialog-container,
+                #gdpr-cookie-notice, .modal-backdrop, #ad_position_box,
+                [class*='adservice-overlay'], [id*='google_ads'],
+                .adclass, #BottomAd, .top-banner-ad {
                     display: none !important;
                     visibility: hidden !important;
                     pointer-events: none !important;
@@ -78,25 +93,40 @@ def page(browser, request, pytestconfig):
                     height: 0 !important;
                     width: 0 !important;
                 }
-                body { overflow: auto !important; }
+                body, html { overflow: auto !important; }
             `;
             document.head.appendChild(style);
 
-            setInterval(() => {
-                const selectors = ['.fc-consent-root', '.fc-dialog-overlay', '.fc-dialog-container', '#gdpr-cookie-notice'];
+            const killOverlays = () => {
+                const selectors = [
+                    '.fc-consent-root', '.fc-dialog-overlay', '.fc-dialog-container',
+                    '#gdpr-cookie-notice', '.modal-backdrop', '#ad_position_box',
+                    '[id*="google_ads_iframe"]', '[id^="aswift_"]'
+                ];
                 selectors.forEach(s => {
-                    const el = document.querySelector(s);
-                    if (el) el.remove();
+                    document.querySelectorAll(s).forEach(el => el.remove());
                 });
-                document.body.style.overflow = 'auto';
-            }, 500);
+                document.body && (document.body.style.overflow = 'auto');
+                document.body && (document.body.style.paddingRight = '0');
+                document.documentElement && (document.documentElement.style.overflow = 'auto');
+            };
+            
+            // Run immediately and then on a short interval
+            killOverlays();
+            setInterval(killOverlays, 300);
         })();
     """)
 
     def handle_consent():
         try:
-            buttons = ["button.fc-primary-button", "button:has-text('Consent')", "button:has-text('AGREE')"]
-            for selector in buttons:
+            selectors = [
+                "button.fc-primary-button",
+                "button:has-text('Consent')",
+                "button:has-text('AGREE')",
+                "button:has-text('Accept')",
+                "button:has-text('OK')",
+            ]
+            for selector in selectors:
                 btn = page_instance.locator(selector).first
                 if btn.is_visible(timeout=500):
                     btn.click(force=True)
