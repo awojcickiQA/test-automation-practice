@@ -1,0 +1,6 @@
+pytest
+pytest-playwright
+Faker
+pytest-html
+pytest-metadata
+pytest-xdist
