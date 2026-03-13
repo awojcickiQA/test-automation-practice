@@ -139,6 +139,16 @@ def page(browser, request, pytestconfig):
 
     context.close()
 
+@pytest.fixture(scope="session")
+def api_context(pytestconfig):
+    from playwright.sync_api import sync_playwright
+    with sync_playwright() as p:
+        request_context = p.request.new_context(
+            base_url="https://jsonplaceholder.typicode.com"
+        )
+        yield request_context
+        request_context.dispose()
+
 @pytest.hookimpl(hookwrapper=True)
 def pytest_runtest_makereport(item, call):
     outcome = yield
