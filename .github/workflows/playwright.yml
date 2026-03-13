@@ -6,6 +6,15 @@ on:
   pull_request:
     branches: [ main, master ]
   workflow_dispatch:
+    inputs:
+      report:
+        description: 'Enable advanced reporting (true/false)'
+        required: false
+        default: 'true'
+      report_strategy:
+        description: 'Reporting strategy (passed, failed, all)'
+        required: false
+        default: 'failed'
 
 jobs:
   test:
@@ -34,12 +43,14 @@ jobs:
 
     - name: Run Playwright tests
       run: |
-        PYTHONPATH=. pytest --browser_name=${{ matrix.browser }} --headless_mode=true --html=report-${{ matrix.browser }}.html --self-contained-html
+        PYTHONPATH=. pytest --browser_name=${{ matrix.browser }} --headless_mode=true --report=${{ github.event.inputs.report || 'true' }} --report_strategy=${{ github.event.inputs.report_strategy || 'failed' }} --html=report-${{ matrix.browser }}.html --self-contained-html
       
-    - name: Upload Test Report
+    - name: Upload Test Results
       if: always()
       uses: actions/upload-artifact@v4
       with:
-        name: playwright-report-${{ matrix.browser }}
-        path: report-${{ matrix.browser }}.html
+        name: playwright-results-${{ matrix.browser }}
+        path: |
+          report-${{ matrix.browser }}.html
+          reports/
         retention-days: 30
