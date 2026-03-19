@@ -16,7 +16,10 @@ class ProductsPage(BasePage):
 
     def add_first_product_to_cart(self):
         self.page.locator(".product-image-wrapper").first.hover()
-        self.page.locator(".add-to-cart").first.click()
+        # Use forced click as this button can be finicky on Chromium
+        self.page.locator(".add-to-cart").first.click(force=True)
+        # Wait for the confirmation modal to appear - use .first to avoid strict mode
+        self.page.locator("#cartModal").first.wait_for(state="visible", timeout=10000)
 
     def continue_shopping(self):
         self.click("button.btn-success:has-text('Continue Shopping')")

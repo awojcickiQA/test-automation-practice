@@ -52,68 +52,71 @@ def page(browser, request, pytestconfig):
         context_args["record_video_dir"] = str(video_dir)
 
     context = browser.new_context(**context_args)
-    
-    # Block known ad/tracker domains aggressively
-    blocked_domains = [
-        "googleads", "doubleclick", "adservice", "googlesyndication",
-        "adnxs", "rubiconproject", "openx", "pubmatic", "quantserve",
-        "scorecardresearch", "amazon-adsystem", "bing.com/action/0",
-        "convert.com", "hotjar.com", "fonts.googleapis.com"
-    ]
-    context.route(
-        "**/*",
-        lambda route: route.abort()
-        if any(d in route.request.url for d in blocked_domains)
-        else route.continue_()
-    )
+
+    # DON'T block domains as it breaks site scripts/modals
+    # Instead, we will aggressively dismiss/hide overlays via handlers and JS
     
     page_instance = context.new_page()
     # Increased timeout for slow CI runners
     page_instance.set_default_timeout(60000)
     page_instance.set_default_navigation_timeout(60000)
     
-    # Combined Ad and Consent removal (CSS + JS removal + body unlock)
+    # Handle Google Vignette (Full page ads) - VERY common on this site
+    def handle_vignette():
+        try:
+            # We try multiple ways to close it, then hide it just in case
+            page_instance.evaluate("""() => {
+                const selectors = ['#dismiss-button', '.close-button', '#close-button'];
+                selectors.forEach(s => {
+                    const el = document.querySelector(s);
+                    if (el) el.click();
+                });
+                // Force hide any adsbygoogle containers that might be blocking
+                document.querySelectorAll('ins.adsbygoogle, .adsbygoogle').forEach(el => {
+                    el.style.setProperty('display', 'none', 'important');
+                });
+                // If it's an iframe vignette, try to hide the host
+                document.querySelectorAll('iframe[id*="aswift"], iframe[id*="google_ads"]').forEach(f => {
+                    f.style.setProperty('display', 'none', 'important');
+                });
+            }""")
+        except:
+            pass
+    
+    # Set up handlers for various ad types
+    page_instance.add_locator_handler(page_instance.locator("ins.adsbygoogle").first, handle_vignette)
+    page_instance.add_locator_handler(page_instance.locator("iframe[id^='aswift_']").first, handle_vignette)
+    page_instance.add_locator_handler(page_instance.locator("iframe[id*='google_ads_iframe']").first, handle_vignette)
+    
+    # Also handle the common consent popup
+    def handle_consent():
+        try:
+            selectors = ["button.fc-primary-button", "button:has-text('Consent')", "button:has-text('AGREE')"]
+            for s in selectors:
+                btn = page_instance.locator(s).first
+                if btn.is_visible(timeout=500):
+                    btn.click(force=True)
+                    return
+        except: pass
+
+    page_instance.add_locator_handler(page_instance.locator(".fc-consent-root").first, handle_consent)
+
+    # Minimal JS overlay killer that doesn't use 'display: none' on potential site elements
     page_instance.add_init_script("""
         (() => {
-            const style = document.createElement('style');
-            style.innerHTML = `
-                iframe, .adsbygoogle, #google_ads_iframe, [id^='google_ads_iframe'], 
-                #aswift_0_host, #aswift_1_host, #aswift_2_host, 
-                div[style*='z-index: 2000000000'],
-                .fc-consent-root, .fc-dialog-overlay, .fc-dialog-container,
-                #gdpr-cookie-notice, .modal-backdrop, #ad_position_box,
-                [class*='adservice-overlay'], [id*='google_ads'],
-                .adclass, #BottomAd, .top-banner-ad {
-                    display: none !important;
-                    visibility: hidden !important;
-                    pointer-events: none !important;
-                    position: absolute !important;
-                    left: -9999px !important;
-                    opacity: 0 !important;
-                    height: 0 !important;
-                    width: 0 !important;
-                }
-                body, html { overflow: auto !important; }
-            `;
-            document.head.appendChild(style);
-
             const killOverlays = () => {
-                const selectors = [
-                    '.fc-consent-root', '.fc-dialog-overlay', '.fc-dialog-container',
-                    '#gdpr-cookie-notice', '.modal-backdrop', '#ad_position_box',
-                    '[id*="google_ads_iframe"]', '[id^="aswift_"]'
-                ];
+                const selectors = ['#ad_position_box', '.grippy-host'];
                 selectors.forEach(s => {
-                    document.querySelectorAll(s).forEach(el => el.remove());
+                    const el = document.querySelector(s);
+                    if (el) el.style.setProperty('display', 'none', 'important');
                 });
-                document.body && (document.body.style.overflow = 'auto');
-                document.body && (document.body.style.paddingRight = '0');
-                document.documentElement && (document.documentElement.style.overflow = 'auto');
+                // Ensure body is not locked by an ad's backdrop
+                if (document.body && document.body.style.overflow === 'hidden') {
+                    document.body.style.overflow = 'auto';
+                }
             };
-            
-            // Run immediately and then on a short interval
             killOverlays();
-            setInterval(killOverlays, 300);
+            setInterval(killOverlays, 1000);
         })();
     """)
 

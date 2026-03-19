@@ -11,7 +11,11 @@ class BasePage:
         locator = self.page.locator(selector).first
         locator.wait_for(state="visible", timeout=15000)
         locator.scroll_into_view_if_needed()
-        locator.click(force=force)
+        try:
+            locator.click(force=force, timeout=5000)
+        except Exception:
+            # Fallback to forced click if standard click fails (e.g. ad overlay)
+            locator.click(force=True)
 
     def fill(self, selector: str, text: str):
         locator = self.page.locator(selector).first

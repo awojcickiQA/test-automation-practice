@@ -28,8 +28,10 @@ class CheckoutPage(BasePage):
     def download_invoice(self):
         with self.page.expect_download() as download_info:
             # Use text based locator as it's often more resilient on this site
-            locator = self.page.get_by_role("link", name="Download Invoice")
+            locator = self.page.get_by_role("link", name="Download Invoice").first
+            locator.wait_for(state="visible", timeout=15000)
             locator.scroll_into_view_if_needed()
+            # Force click to bypass any potential overlays from ads
             locator.click(force=True)
         download = download_info.value
         return download
