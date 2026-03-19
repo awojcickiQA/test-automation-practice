@@ -53,11 +53,20 @@ class LoginSignupPage(BasePage):
         self.fill("input[data-qa='zipcode']", zipcode)
         self.fill("input[data-qa='mobile_number']", mobile_number)
 
+        self.page.locator("button[data-qa='create-account']").scroll_into_view_if_needed()
         self.click("button[data-qa='create-account']")
 
     def verify_account_created(self):
-        expect(self.page.locator("h2[data-qa='account-created']")).to_have_text("ACCOUNT CREATED!", ignore_case=True)
-        self.click("a[data-qa='continue-button']")
+        try:
+            expect(self.page.locator("h2[data-qa='account-created']")).to_have_text("ACCOUNT CREATED!", ignore_case=True, timeout=15000)
+            self.click("a[data-qa='continue-button']")
+        except Exception as e:
+            # Capture screenshot on failure for CI/CD debugging
+            import os
+            screenshot_dir = "reports/screenshots"
+            os.makedirs(screenshot_dir, exist_ok=True)
+            self.page.screenshot(path=f"{screenshot_dir}/failed_account_created.png")
+            raise e
 
     def verify_account_deleted(self):
         expect(self.page.locator("h2[data-qa='account-deleted']")).to_have_text("ACCOUNT DELETED!", ignore_case=True)

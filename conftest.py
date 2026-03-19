@@ -105,18 +105,29 @@ def page(browser, request, pytestconfig):
     page_instance.add_init_script("""
         (() => {
             const killOverlays = () => {
-                const selectors = ['#ad_position_box', '.grippy-host'];
+                const selectors = [
+                    '#ad_position_box', '.grippy-host', '.ad-unit', 
+                    '[id^="aswift_"]', '[id^="google_ads_iframe"]',
+                    '.fc-consent-root', '.fc-dialog-overlay'
+                ];
                 selectors.forEach(s => {
-                    const el = document.querySelector(s);
-                    if (el) el.style.setProperty('display', 'none', 'important');
+                    document.querySelectorAll(s).forEach(el => {
+                        el.style.setProperty('display', 'none', 'important');
+                        el.style.setProperty('visibility', 'hidden', 'important');
+                        el.style.setProperty('pointer-events', 'none', 'important');
+                    });
                 });
-                // Ensure body is not locked by an ad's backdrop
-                if (document.body && document.body.style.overflow === 'hidden') {
-                    document.body.style.overflow = 'auto';
+                // Aggressively unlock body scroll
+                if (document.body) {
+                    document.body.style.setProperty('overflow', 'auto', 'important');
+                    document.body.style.setProperty('position', 'static', 'important');
+                }
+                if (document.documentElement) {
+                    document.documentElement.style.setProperty('overflow', 'auto', 'important');
                 }
             };
             killOverlays();
-            setInterval(killOverlays, 1000);
+            setInterval(killOverlays, 500);
         })();
     """)
 
