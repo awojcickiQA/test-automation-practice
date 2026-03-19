@@ -108,10 +108,13 @@ def page(browser, request, pytestconfig):
                 const selectors = [
                     '#ad_position_box', '.grippy-host', '.ad-unit', 
                     '[id^="aswift_"]', '[id^="google_ads_iframe"]',
-                    '.fc-consent-root', '.fc-dialog-overlay'
+                    '.fc-consent-root', '.fc-dialog-overlay',
+                    '#dimmer', '.modal-backdrop', '.fade.in', '.fc-ab-root'
                 ];
                 selectors.forEach(s => {
                     document.querySelectorAll(s).forEach(el => {
+                        // Only hide if it's likely an ad, not a legitimate modal
+                        if (el.id === 'cartModal' || el.classList.contains('cart-modal')) return;
                         el.style.setProperty('display', 'none', 'important');
                         el.style.setProperty('visibility', 'hidden', 'important');
                         el.style.setProperty('pointer-events', 'none', 'important');
@@ -124,10 +127,11 @@ def page(browser, request, pytestconfig):
                 }
                 if (document.documentElement) {
                     document.documentElement.style.setProperty('overflow', 'auto', 'important');
+                    document.documentElement.style.setProperty('position', 'static', 'important');
                 }
             };
             killOverlays();
-            setInterval(killOverlays, 500);
+            setInterval(killOverlays, 400); // More frequent
         })();
     """)
 

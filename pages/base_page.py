@@ -20,6 +20,9 @@ class BasePage:
     def fill(self, selector: str, text: str):
         locator = self.page.locator(selector).first
         locator.wait_for(state="visible", timeout=15000)
+        locator.scroll_into_view_if_needed()
+        # Ensure we can type in it
+        locator.clear()
         locator.fill(text)
 
     def is_visible(self, selector: str) -> bool:

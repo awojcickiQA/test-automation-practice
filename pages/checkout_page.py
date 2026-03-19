@@ -9,15 +9,27 @@ class CheckoutPage(BasePage):
 
     def enter_comment_and_place_order(self, comment: str):
         self.fill("textarea[name='message']", comment)
+        self.page.locator("a[href='/payment']").scroll_into_view_if_needed()
         self.click("a[href='/payment']")
 
     def enter_payment_details(self, name_on_card: str, card_number: str, cvc: str, mm: str, yyyy: str):
-        self.fill("input[name='name_on_card']", name_on_card)
-        self.fill("input[name='card_number']", card_number)
-        self.fill("input[name='cvc']", cvc)
-        self.fill("input[name='expiry_month']", mm)
-        self.fill("input[name='expiry_year']", yyyy)
-        self.click("button[data-qa='pay-button']")
+        try:
+            # Wait for the payment form to be ready
+            self.page.locator("input[name='name_on_card']").wait_for(state="visible", timeout=15000)
+            
+            self.fill("input[name='name_on_card']", name_on_card)
+            self.fill("input[name='card_number']", card_number)
+            self.fill("input[name='cvc']", cvc)
+            self.fill("input[name='expiry_month']", mm)
+            self.fill("input[name='expiry_year']", yyyy)
+            self.click("button[data-qa='pay-button']")
+        except Exception as e:
+            # Capture screenshot on failure for CI/CD debugging
+            import os
+            screenshot_dir = "reports/screenshots"
+            os.makedirs(screenshot_dir, exist_ok=True)
+            self.page.screenshot(path=f"{screenshot_dir}/failed_payment_details.png")
+            raise e
 
     def verify_order_placed(self):
         expect(self.page.locator("h2[data-qa='order-placed']")).to_have_text("ORDER PLACED!", ignore_case=True)

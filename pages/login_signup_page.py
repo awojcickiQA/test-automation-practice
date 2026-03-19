@@ -55,6 +55,8 @@ class LoginSignupPage(BasePage):
 
         self.page.locator("button[data-qa='create-account']").scroll_into_view_if_needed()
         self.click("button[data-qa='create-account']")
+        # Ensure submission is processed
+        self.page.wait_for_load_state("networkidle", timeout=10000)
 
     def verify_account_created(self):
         try:
