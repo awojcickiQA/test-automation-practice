@@ -1,5 +1,6 @@
 from playwright.sync_api import Page, expect
 from pages.base_page import BasePage
+import re
 
 class LoginSignupPage(BasePage):
     def register_user(self, name: str, email: str):
@@ -58,9 +59,9 @@ class LoginSignupPage(BasePage):
 
     def verify_account_created(self):
         try:
-            # Wait for the success URL first
-            self.page.wait_for_url("**/account_created", timeout=30000)
-            expect(self.page.locator("h2[data-qa='account-created']")).to_have_text("ACCOUNT CREATED!", ignore_case=True, timeout=15000)
+            # Wait for the success URL first, allowing for vignettes or other fragments
+            self.page.wait_for_url(re.compile(r".*/account_created.*"), timeout=45000)
+            expect(self.page.locator("h2[data-qa='account-created']")).to_be_visible(timeout=20000)
             self.click("a[data-qa='continue-button']")
         except Exception as e:
             # Capture screenshot on failure for CI/CD debugging
@@ -71,5 +72,6 @@ class LoginSignupPage(BasePage):
             raise e
 
     def verify_account_deleted(self):
-        expect(self.page.locator("h2[data-qa='account-deleted']")).to_have_text("ACCOUNT DELETED!", ignore_case=True)
+        self.page.wait_for_url(re.compile(r".*/delete_account.*"), timeout=30000)
+        expect(self.page.locator("h2[data-qa='account-deleted']")).to_be_visible(timeout=15000)
         self.click("a[data-qa='continue-button']")

@@ -69,6 +69,25 @@ def page(browser, request, pytestconfig):
     page_instance.set_default_timeout(60000)
     page_instance.set_default_navigation_timeout(60000)
     
+    # Network level ad blocking
+    def intercept_route(route):
+        ad_domains = [
+            "doubleclick.net",
+            "googlesyndication.com",
+            "google-analytics.com",
+            "googleadservices.com",
+            "googletagservices.com",
+            "adsbygoogle",
+            "amazon-adsystem.com",
+            "adnxs.com"
+        ]
+        if any(domain in route.request.url for domain in ad_domains):
+            route.abort()
+        else:
+            route.continue_()
+
+    page_instance.route("**/*", intercept_route)
+    
     # Surgical init script for minor cleanup that doesn't break site
     page_instance.add_init_script("""
         (() => {
