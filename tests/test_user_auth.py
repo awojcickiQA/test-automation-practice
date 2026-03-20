@@ -3,13 +3,17 @@ from faker import Faker
 from pages.home_page import HomePage
 from pages.login_signup_page import LoginSignupPage
 
+import time
+
 fake = Faker()
 
 @pytest.fixture
 def test_data():
+    # Use nanoseconds for better uniqueness in parallel runs
+    timestamp = time.time_ns()
     return {
         "name": fake.name(),
-        "email": fake.email(),
+        "email": f"test_{timestamp}_{fake.email()}",
         "password": fake.password(),
         "first_name": fake.first_name(),
         "last_name": fake.last_name(),

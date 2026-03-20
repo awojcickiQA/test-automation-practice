@@ -55,11 +55,11 @@ class LoginSignupPage(BasePage):
 
         self.page.locator("button[data-qa='create-account']").scroll_into_view_if_needed()
         self.click("button[data-qa='create-account']")
-        # Ensure submission is processed
-        self.page.wait_for_load_state("networkidle", timeout=10000)
 
     def verify_account_created(self):
         try:
+            # Wait for the success URL first
+            self.page.wait_for_url("**/account_created", timeout=30000)
             expect(self.page.locator("h2[data-qa='account-created']")).to_have_text("ACCOUNT CREATED!", ignore_case=True, timeout=15000)
             self.click("a[data-qa='continue-button']")
         except Exception as e:

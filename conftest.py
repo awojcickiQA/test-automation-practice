@@ -53,85 +53,33 @@ def page(browser, request, pytestconfig):
 
     context = browser.new_context(**context_args)
 
-    # DON'T block domains as it breaks site scripts/modals
-    # Instead, we will aggressively dismiss/hide overlays via handlers and JS
+    # Domain-based blocking disabled as it interferes with site modals
+    # rely on init_script for ad management instead
     
     page_instance = context.new_page()
-    # Increased timeout for slow CI runners
     page_instance.set_default_timeout(60000)
     page_instance.set_default_navigation_timeout(60000)
     
-    # Handle Google Vignette (Full page ads) - VERY common on this site
-    def handle_vignette():
-        try:
-            # We try multiple ways to close it, then hide it just in case
-            page_instance.evaluate("""() => {
-                const selectors = ['#dismiss-button', '.close-button', '#close-button'];
-                selectors.forEach(s => {
-                    const el = document.querySelector(s);
-                    if (el) el.click();
-                });
-                // Force hide any adsbygoogle containers that might be blocking
-                document.querySelectorAll('ins.adsbygoogle, .adsbygoogle').forEach(el => {
-                    el.style.setProperty('display', 'none', 'important');
-                });
-                // If it's an iframe vignette, try to hide the host
-                document.querySelectorAll('iframe[id*="aswift"], iframe[id*="google_ads"]').forEach(f => {
-                    f.style.setProperty('display', 'none', 'important');
-                });
-            }""")
-        except:
-            pass
-    
-    # Set up handlers for various ad types
-    page_instance.add_locator_handler(page_instance.locator("ins.adsbygoogle").first, handle_vignette)
-    page_instance.add_locator_handler(page_instance.locator("iframe[id^='aswift_']").first, handle_vignette)
-    page_instance.add_locator_handler(page_instance.locator("iframe[id*='google_ads_iframe']").first, handle_vignette)
-    
-    # Also handle the common consent popup
-    def handle_consent():
-        try:
-            selectors = ["button.fc-primary-button", "button:has-text('Consent')", "button:has-text('AGREE')"]
-            for s in selectors:
-                btn = page_instance.locator(s).first
-                if btn.is_visible(timeout=500):
-                    btn.click(force=True)
-                    return
-        except: pass
-
-    page_instance.add_locator_handler(page_instance.locator(".fc-consent-root").first, handle_consent)
-
-    # Minimal JS overlay killer that doesn't use 'display: none' on potential site elements
+    # Surgical init script for minor cleanup that doesn't break site
     page_instance.add_init_script("""
         (() => {
-            const killOverlays = () => {
-                const selectors = [
-                    '#ad_position_box', '.grippy-host', '.ad-unit', 
-                    '[id^="aswift_"]', '[id^="google_ads_iframe"]',
-                    '.fc-consent-root', '.fc-dialog-overlay',
-                    '#dimmer', '.modal-backdrop', '.fade.in', '.fc-ab-root'
+            const cleanup = () => {
+                // Remove ad placeholders and consent banners
+                const adSelectors = [
+                    '#ad_position_box', '.grippy-host', 'ins.adsbygoogle', 
+                    'iframe[id*="google_ads"]', '.fc-ab-root', '.fc-consent-root',
+                    '.modal-backdrop.fade.in' // Leaked modal backdrops
                 ];
-                selectors.forEach(s => {
-                    document.querySelectorAll(s).forEach(el => {
-                        // Only hide if it's likely an ad, not a legitimate modal
-                        if (el.id === 'cartModal' || el.classList.contains('cart-modal')) return;
-                        el.style.setProperty('display', 'none', 'important');
-                        el.style.setProperty('visibility', 'hidden', 'important');
-                        el.style.setProperty('pointer-events', 'none', 'important');
-                    });
+                adSelectors.forEach(s => {
+                    document.querySelectorAll(s).forEach(el => el.remove());
                 });
-                // Aggressively unlock body scroll
+                // Force body scroll to be always active
                 if (document.body) {
                     document.body.style.setProperty('overflow', 'auto', 'important');
-                    document.body.style.setProperty('position', 'static', 'important');
-                }
-                if (document.documentElement) {
-                    document.documentElement.style.setProperty('overflow', 'auto', 'important');
-                    document.documentElement.style.setProperty('position', 'static', 'important');
                 }
             };
-            killOverlays();
-            setInterval(killOverlays, 400); // More frequent
+            cleanup();
+            setInterval(cleanup, 1000);
         })();
     """)
 
