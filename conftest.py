@@ -2,6 +2,7 @@ import pytest
 import os
 import shutil
 from pathlib import Path
+from typing import Any, Dict
 from playwright.sync_api import sync_playwright
 
 def pytest_addoption(parser):
@@ -29,7 +30,14 @@ def browser(playwright_instance, pytestconfig):
     headless = pytestconfig.getoption("headless_mode").lower() == "true"
     
     if browser_name == "chromium":
-        browser_instance = playwright_instance.chromium.launch(headless=headless)
+        browser_instance = playwright_instance.chromium.launch(
+            headless=headless,
+            args=[
+                "--disable-dev-shm-usage",
+                "--no-sandbox",
+                "--disable-gpu"
+            ]
+        )
     elif browser_name == "firefox":
         browser_instance = playwright_instance.firefox.launch(headless=headless)
     elif browser_name == "webkit":
@@ -45,7 +53,8 @@ def page(browser, request, pytestconfig):
     enable_report = pytestconfig.getoption("--report").lower() == "true"
     
     # Configure context with video recording if reporting is enabled
-    context_args = {"viewport": {"width": 1920, "height": 1080}}
+    context_args: Dict[str, Any] = {}
+    context_args["viewport"] = {"width": 1920, "height": 1080}
     if enable_report:
         video_dir = Path("reports/videos")
         video_dir.mkdir(parents=True, exist_ok=True)
@@ -68,14 +77,20 @@ def page(browser, request, pytestconfig):
                 const adSelectors = [
                     '#ad_position_box', '.grippy-host', 'ins.adsbygoogle', 
                     'iframe[id*="google_ads"]', '.fc-ab-root', '.fc-consent-root',
-                    '.modal-backdrop.fade.in' // Leaked modal backdrops
+                    '.modal-backdrop.fade.in', // Leaked modal backdrops
+                    'div[id*="aswift"]', 'div[id*="google_ads"]', // Common Google Ad containers
+                    '#google_vignette_container' // Specifically Google Vignette
                 ];
                 adSelectors.forEach(s => {
-                    document.querySelectorAll(s).forEach(el => el.remove());
+                    document.querySelectorAll(s).forEach(el => {
+                        try { el.remove(); } catch(e) {}
+                    });
                 });
-                // Force body scroll to be always active
+                
+                // Force body scroll and visibility
                 if (document.body) {
                     document.body.style.setProperty('overflow', 'auto', 'important');
+                    document.body.style.setProperty('visibility', 'visible', 'important');
                 }
             };
             cleanup();
@@ -84,6 +99,7 @@ def page(browser, request, pytestconfig):
     """)
 
     def handle_consent():
+        # ... logic for consent buttons ...
         try:
             selectors = [
                 "button.fc-primary-button",
@@ -100,7 +116,14 @@ def page(browser, request, pytestconfig):
         except:
             pass
 
+    # Handler for Google Consent
     page_instance.add_locator_handler(page_instance.locator(".fc-consent-root"), handle_consent)
+    
+    # Handler for Google Vignette (Full screen ads)
+    # Often the button is inside an iframe, but Playwright's locator handler can help if it's top-level
+    # or we can target the dismiss button if it's accessible.
+    vignette_dismiss = page_instance.locator("#dismiss-button, .dismiss-button, [aria-label='Close ad']").first
+    page_instance.add_locator_handler(vignette_dismiss, lambda: vignette_dismiss.click(force=True))
     
     yield page_instance
 

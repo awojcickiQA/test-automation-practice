@@ -12,9 +12,12 @@ class BasePage:
         locator.wait_for(state="visible", timeout=15000)
         locator.scroll_into_view_if_needed()
         try:
+            # Short wait for any potential overlays to be handled by locator_handler
+            self.page.wait_for_timeout(100) 
             locator.click(force=force, timeout=5000)
         except Exception:
             # Fallback to forced click if standard click fails (e.g. ad overlay)
+            # This is particularly useful on automationexercise.com
             locator.click(force=True)
 
     def fill(self, selector: str, text: str):

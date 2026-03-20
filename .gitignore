@@ -10,3 +10,5 @@ env/
 debug_*.png
 test_upload.txt
 .DS_Store
+report-*.html
+reports/
